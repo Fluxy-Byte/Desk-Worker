@@ -20,8 +20,14 @@ async function consume(channel: Channel, queue: string, handler: (payload: any) 
 
     try {
       const payload = JSON.parse(msg.content.toString());
+      if (queue === QUEUE_DESK_MESSAGE_OUTBOUND) {
+        console.log(`[DESK-MSG][consumer] mensagem recebida da fila ${queue} — payload=${JSON.stringify(payload)}`);
+      }
       await handler(payload);
       channel.ack(msg);
+      if (queue === QUEUE_DESK_MESSAGE_OUTBOUND) {
+        console.log(`[DESK-MSG][consumer] mensagem da fila ${queue} processada e ack enviado — ticketId=${payload?.ticketId}`);
+      }
     } catch (error) {
       console.error(`Erro ao processar mensagem da fila ${queue}:`, error);
       channel.nack(msg, false, false);

@@ -13,20 +13,28 @@ interface DeskMessageOutboundPayload {
 /// atendente envia uma mensagem. mongoMessageId começa null e é preenchido
 /// depois via `desk.message.sent` (reconciliação, ver handle-desk-message-sent).
 export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayload): Promise<void> {
+  console.log(`[DESK-MSG][handleDeskMessageOutbound] início — ticketId=${payload.ticketId} attendantUserId=${payload.attendantUserId}`);
+
   const ticket = await prisma.ticket.findUnique({
     where: { id: payload.ticketId },
     include: { target: { include: { whatsappChannel: true } }, messagingSession: true },
   });
 
   if (!ticket) {
-    console.error(`desk.message.outbound: ticket ${payload.ticketId} não encontrado — ignorando.`);
+    console.error(`[DESK-MSG][handleDeskMessageOutbound] ticket ${payload.ticketId} não encontrado — ignorando.`);
     return;
   }
 
   if (ticket.status !== "IN_PROGRESS") {
-    console.error(`desk.message.outbound: ticket ${payload.ticketId} não está IN_PROGRESS (status=${ticket.status}) — ignorando.`);
+    console.error(
+      `[DESK-MSG][handleDeskMessageOutbound] ticket ${payload.ticketId} não está IN_PROGRESS (status=${ticket.status}) — ignorando.`,
+    );
     return;
   }
+
+  console.log(
+    `[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} target=${ticket.target.id} whatsappChannelId=${ticket.target.whatsappChannel.id} — gravando ticketMessage`,
+  );
 
   await prisma.ticketMessage.create({
     data: {
@@ -43,6 +51,8 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     data: { lastAttendantMessageAt: new Date() },
   });
 
+  console.log(`[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} publicando em outbound.message.send`);
+
   const channel = await getRabbitChannel();
   await publishOutboundMessage(channel, {
     target: ticket.target,
@@ -53,4 +63,6 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     origin: "ATTENDANT",
     ticketId: ticket.id,
   });
+
+  console.log(`[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} concluído — publicado em outbound.message.send`);
 }
