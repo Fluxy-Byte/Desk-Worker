@@ -7,6 +7,7 @@ interface DeskMessageOutboundPayload {
   text: string;
   attendantUserId: string;
   messageType?: "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER";
+  mediaUrl?: string;
 }
 
 /// Consome `desk.message.outbound` — publicado pelo Desk-API quando um
@@ -36,6 +37,9 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     `[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} target=${ticket.target.id} whatsappChannelId=${ticket.target.whatsappChannel.id} — gravando ticketMessage`,
   );
 
+  // Só metadado (quem/quando/tipo) — o conteúdo (texto/mediaUrl) vive no
+  // documento Mongo, gravado pelo Outbound-Worker e reconciliado depois via
+  // desk.message.sent (ver handle-desk-message-sent).
   await prisma.ticketMessage.create({
     data: {
       ticketId: ticket.id,
@@ -59,6 +63,8 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     whatsappChannel: ticket.target.whatsappChannel,
     messagingSession: ticket.messagingSession,
     answer: { text: payload.text, audio: "", image: "" },
+    messageType: payload.messageType,
+    mediaUrl: payload.mediaUrl,
     finishesProcessing: true,
     origin: "ATTENDANT",
     ticketId: ticket.id,
