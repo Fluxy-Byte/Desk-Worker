@@ -23,7 +23,7 @@ async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
       update: { lastNumber: { increment: 1 } },
     });
 
-    return tx.ticket.create({
+    const ticket = await tx.ticket.create({
       data: {
         organizationId: input.organizationId,
         queueId: input.queueId,
@@ -33,6 +33,17 @@ async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
         status: "WAITING",
       },
     });
+
+    // Sem isso o Target nunca sai de "AI": o Inbound-Service decide o roteamento
+    // (fila do agente vs. desk.message.inbound) checando Target.status === "HUMAN",
+    // e o ticket-service (Desk-API) só devolve pra "AI" quando o ticket fecha —
+    // então a transição pra "HUMAN" tem que acontecer aqui, atomicamente com a
+    // criação do ticket, senão as próximas mensagens do cliente continuam indo
+    // pro pipeline de IA mesmo com atendente aberto.
+    await tx.target.update({ where: { id: input.targetId }, data: { status: "HUMAN" } });
+    console.log(`[DESK-MSG][find-or-create-open-ticket] targetId=${input.targetId} status atualizado para HUMAN — ticketId=${ticket.id}`);
+
+    return ticket;
   });
 }
 
