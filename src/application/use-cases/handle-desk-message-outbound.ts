@@ -1,6 +1,7 @@
 import { prisma } from "../../infrastructure/database/prisma/client";
+import { getLastInboundMessage } from "../../infrastructure/cache/redis/last-inbound-message";
 import { getRabbitChannel } from "../../infrastructure/queue/rabbitmq/connection";
-import { publishOutboundMessage } from "../../infrastructure/queue/rabbitmq/publisher";
+import { publishMarkRead, publishOutboundMessage } from "../../infrastructure/queue/rabbitmq/publisher";
 
 interface DeskMessageOutboundPayload {
   ticketId: string;
@@ -37,6 +38,21 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     `[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} target=${ticket.target.id} whatsappChannelId=${ticket.target.whatsappChannel.id} — gravando ticketMessage`,
   );
 
+  const channel = await getRabbitChannel();
+
+  // Assim que o atendente responde, marca a última mensagem do cliente como
+  // lida e liga o "digitando..." — best-effort, sem externalMessageId
+  // guardado (sessão sem mensagem inbound recente, TTL expirado etc.) só
+  // segue sem o indicador.
+  const lastInboundExternalMessageId = await getLastInboundMessage(ticket.messagingSessionId);
+  if (lastInboundExternalMessageId) {
+    await publishMarkRead(channel, {
+      phoneNumberId: ticket.target.whatsappChannel.phoneNumberId,
+      externalMessageId: lastInboundExternalMessageId,
+      typingIndicator: true,
+    });
+  }
+
   // Só metadado (quem/quando/tipo) — o conteúdo (texto/mediaUrl) vive no
   // documento Mongo, gravado pelo Outbound-Worker e reconciliado depois via
   // desk.message.sent (ver handle-desk-message-sent).
@@ -57,7 +73,6 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
 
   console.log(`[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} publicando em outbound.message.send`);
 
-  const channel = await getRabbitChannel();
   await publishOutboundMessage(channel, {
     target: ticket.target,
     whatsappChannel: ticket.target.whatsappChannel,

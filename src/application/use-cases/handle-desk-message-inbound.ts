@@ -1,4 +1,5 @@
 import { prisma } from "../../infrastructure/database/prisma/client";
+import { setLastInboundMessage } from "../../infrastructure/cache/redis/last-inbound-message";
 import { getRabbitChannel } from "../../infrastructure/queue/rabbitmq/connection";
 import { publishOutboundMessage } from "../../infrastructure/queue/rabbitmq/publisher";
 import { publishDeskEvent } from "../../infrastructure/pubsub/desk-events";
@@ -61,6 +62,10 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
       messageType: normalizeMessageType(payload.message.type),
     },
   });
+
+  if (payload.message.externalMessageId) {
+    await setLastInboundMessage(payload.messagingSession.id, payload.message.externalMessageId);
+  }
 
   await prisma.messagingSession.update({
     where: { id: payload.messagingSession.id },

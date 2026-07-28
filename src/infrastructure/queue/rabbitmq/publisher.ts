@@ -2,6 +2,7 @@ import type { Channel } from "amqplib";
 import { assertQueueWithDlq } from "./connection";
 
 export const QUEUE_OUTBOUND_MESSAGE_SEND = "outbound.message.send";
+export const QUEUE_OUTBOUND_MESSAGE_MARK_READ = "outbound.message.mark-read";
 
 interface OutboundMessagePayload {
   target: unknown;
@@ -23,4 +24,17 @@ async function publish(channel: Channel, queue: string, payload: object): Promis
 
 export async function publishOutboundMessage(channel: Channel, payload: OutboundMessagePayload): Promise<void> {
   await publish(channel, QUEUE_OUTBOUND_MESSAGE_SEND, payload);
+}
+
+interface MarkReadPayload {
+  phoneNumberId: string;
+  externalMessageId: string;
+  typingIndicator: boolean;
+}
+
+/// Pede pro Outbound-Worker marcar a última mensagem do cliente como lida e
+/// ligar o "digitando..." — quem de fato chama a Graph API é o
+/// Outbound-Worker (best-effort, ver outbound-mark-read-consumer.ts).
+export async function publishMarkRead(channel: Channel, payload: MarkReadPayload): Promise<void> {
+  await publish(channel, QUEUE_OUTBOUND_MESSAGE_MARK_READ, payload);
 }
