@@ -2,6 +2,7 @@ import { prisma } from "../../infrastructure/database/prisma/client";
 import { getLastInboundMessage } from "../../infrastructure/cache/redis/last-inbound-message";
 import { getRabbitChannel } from "../../infrastructure/queue/rabbitmq/connection";
 import { publishMarkRead, publishOutboundMessage } from "../../infrastructure/queue/rabbitmq/publisher";
+import { publishDeskEvent } from "../../infrastructure/pubsub/desk-events";
 
 interface DeskMessageOutboundPayload {
   ticketId: string;
@@ -70,6 +71,11 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     where: { id: ticket.messagingSessionId },
     data: { lastAttendantMessageAt: new Date() },
   });
+
+  // Avisa o front em tempo real assim que a TicketMessage existe — sem isso o
+  // balão otimista de "enviando..." só some quando algum OUTRO evento (resposta
+  // do cliente, tick de status) força um refetch por coincidência.
+  await publishDeskEvent({ type: "ticket_message", ticketId: ticket.id, payload: { ticketId: ticket.id } });
 
   console.log(`[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} publicando em outbound.message.send`);
 
