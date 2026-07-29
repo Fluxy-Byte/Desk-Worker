@@ -8,6 +8,7 @@ interface DeskTicketCreatePayload {
   agent: { id: string; name: string };
   queueId: string;
   handoffReason?: string;
+  assignedUserId?: string;
 }
 
 /// Consome `desk.ticket.create` — publicado pelo AI-Worker no handoff pra
@@ -25,6 +26,7 @@ export async function handleDeskTicketCreate(payload: DeskTicketCreatePayload): 
     whatsappChannel: payload.whatsappChannel,
     messagingSession: payload.messagingSession,
     agentId: payload.agent.id,
+    assignedUserId: payload.assignedUserId,
   });
 }
 

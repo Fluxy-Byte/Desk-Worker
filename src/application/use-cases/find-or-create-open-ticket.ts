@@ -13,6 +13,10 @@ interface FindOrCreateOpenTicketInput {
   whatsappChannel: unknown;
   messagingSession: unknown;
   agentId: string;
+  /// Se preenchido, o ticket já nasce IN_PROGRESS atribuído a este atendente
+  /// em vez de WAITING na fila (ex: campanha que direciona pra um atendente
+  /// específico). O handoff de IA nunca manda isso — comportamento inalterado.
+  assignedUserId?: string;
 }
 
 async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
@@ -30,7 +34,9 @@ async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
         targetId: input.targetId,
         messagingSessionId: input.messagingSessionId,
         ticketNumber: counter.lastNumber,
-        status: "WAITING",
+        status: input.assignedUserId ? "IN_PROGRESS" : "WAITING",
+        assignedUserId: input.assignedUserId ?? null,
+        assignedAt: input.assignedUserId ? new Date() : null,
       },
     });
 
