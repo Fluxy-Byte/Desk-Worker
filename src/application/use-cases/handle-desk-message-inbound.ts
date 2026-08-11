@@ -18,7 +18,10 @@ interface DeskMessageInboundPayload {
 /// Consome `desk.message.inbound` — publicado pelo Inbound-Service quando
 /// Target.status === "HUMAN". Implementa as regras do Desk Worker: ticket
 /// IN_PROGRESS só atualiza e notifica; ticket WAITING reenvia a transferMessage
-/// com throttle; sem ticket aberto (ou CLOSED) vira uma criação nova.
+/// com throttle; sem ticket aberto (ou CLOSED) pra ESTA sessão vira uma criação
+/// nova — recuperando fila/atendente do ticket anterior do target e, se ele
+/// ainda estava aberto (a janela de 24h venceu sem ninguém fechar), fechando-o
+/// agora como SESSION_EXPIRED em vez de deixá-lo órfão pra sempre.
 export async function handleDeskMessageInbound(payload: DeskMessageInboundPayload): Promise<void> {
   const ticket = await prisma.ticket.findFirst({
     where: { messagingSessionId: payload.messagingSession.id },
@@ -26,15 +29,40 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
   });
 
   if (!ticket || ticket.status === "CLOSED") {
+    // Nenhum ticket ABERTO pra esta sessão — pode ser sessão nova (rollover
+    // de 24h no Inbound-Service) ou o ticket desta sessão já foi fechado.
+    // Busca o último ticket do target em QUALQUER sessão: é dele que
+    // recuperamos fila/atendente pra manter a continuidade do atendimento.
+    const latestTicket = await prisma.ticket.findFirst({
+      where: { targetId: payload.target.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Só é "stale" (janela expirou com o ticket ainda aberto) se realmente
+    // ninguém fechou — se já está CLOSED (resolvido/transferido), não mexe:
+    // mantém o comportamento de sempre (cai pra fila padrão do agente).
+    const staleOpenTicket = latestTicket && latestTicket.status !== "CLOSED" ? latestTicket : null;
+
+    if (staleOpenTicket) {
+      await prisma.ticket.update({
+        where: { id: staleOpenTicket.id },
+        data: { status: "CLOSED", closedAt: new Date(), closeReason: "SESSION_EXPIRED" },
+      });
+      console.log(
+        `[DESK-MSG][handle-desk-message-inbound] ticket ${staleOpenTicket.id} fechado como SESSION_EXPIRED (janela expirou, cliente voltou a escrever) targetId=${payload.target.id}`,
+      );
+    }
+
     const channel = await prisma.whatsappChannel.findUnique({
       where: { id: payload.whatsappChannel.id },
       select: { organizationId: true },
     });
     if (!channel) throw new Error(`WhatsappChannel ${payload.whatsappChannel.id} não encontrado.`);
 
-    // Precisamos de uma fila — usamos a fila do ticket anterior se existir,
-    // senão a fila padrão do agente.
-    let queueId = ticket?.queueId;
+    // Precisamos de uma fila — usamos a fila do ticket que acabamos de
+    // reabrir (SESSION_EXPIRED) pra manter o cliente com o mesmo
+    // atendente/fila; senão a fila padrão do agente (comportamento anterior).
+    let queueId = staleOpenTicket?.queueId;
     if (!queueId) {
       const agent = await prisma.agent.findUnique({ where: { id: payload.agent.id } });
       queueId = agent?.defaultQueueId ?? undefined;
@@ -50,6 +78,9 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
       whatsappChannel: payload.whatsappChannel,
       messagingSession: payload.messagingSession,
       agentId: payload.agent.id,
+      assignedUserId:
+        staleOpenTicket?.status === "IN_PROGRESS" ? (staleOpenTicket.assignedUserId ?? undefined) : undefined,
+      transferredFromTicketId: staleOpenTicket?.id,
     });
     return;
   }

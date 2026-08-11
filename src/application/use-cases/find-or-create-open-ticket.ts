@@ -17,6 +17,10 @@ interface FindOrCreateOpenTicketInput {
   /// em vez de WAITING na fila (ex: campanha que direciona pra um atendente
   /// específico). O handoff de IA nunca manda isso — comportamento inalterado.
   assignedUserId?: string;
+  /// Se preenchido, encadeia este ticket ao anterior (mesmo campo que o
+  /// transferTicket do Desk-API usa) — ex: reabertura automática após a
+  /// janela de 24h ter expirado com o ticket anterior ainda aberto.
+  transferredFromTicketId?: string;
 }
 
 async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
@@ -37,6 +41,7 @@ async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
         status: input.assignedUserId ? "IN_PROGRESS" : "WAITING",
         assignedUserId: input.assignedUserId ?? null,
         assignedAt: input.assignedUserId ? new Date() : null,
+        transferredFromTicketId: input.transferredFromTicketId ?? null,
       },
     });
 
