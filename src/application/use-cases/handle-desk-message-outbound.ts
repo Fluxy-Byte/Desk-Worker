@@ -48,6 +48,7 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
   const lastInboundExternalMessageId = await getLastInboundMessage(ticket.messagingSessionId);
   if (lastInboundExternalMessageId) {
     await publishMarkRead(channel, {
+      whatsappChannelId: ticket.target.whatsappChannel.id,
       phoneNumberId: ticket.target.whatsappChannel.phoneNumberId,
       externalMessageId: lastInboundExternalMessageId,
       typingIndicator: true,

@@ -9,6 +9,7 @@ interface DeskTicketCreatePayload {
   queueId: string;
   handoffReason?: string;
   assignedUserId?: string;
+  skipTransferMessage?: boolean;
 }
 
 /// Consome `desk.ticket.create` — publicado pelo AI-Worker no handoff pra
@@ -27,6 +28,7 @@ export async function handleDeskTicketCreate(payload: DeskTicketCreatePayload): 
     messagingSession: payload.messagingSession,
     agentId: payload.agent.id,
     assignedUserId: payload.assignedUserId,
+    skipTransferMessage: payload.skipTransferMessage,
   });
 }
 

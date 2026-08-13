@@ -21,6 +21,10 @@ interface FindOrCreateOpenTicketInput {
   /// transferTicket do Desk-API usa) — ex: reabertura automática após a
   /// janela de 24h ter expirado com o ticket anterior ainda aberto.
   transferredFromTicketId?: string;
+  /// Se true, não envia a transferMessage genérica do agente — usado pelo
+  /// disparo ativo pelo Desk (o contato já recebeu o template disparado pelo
+  /// próprio atendente, a mensagem de handoff não faz sentido nesse caso).
+  skipTransferMessage?: boolean;
 }
 
 async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
@@ -92,17 +96,19 @@ async function sendTransferMessageAndNotify(
   ticket: { id: string; queueId: string },
   input: FindOrCreateOpenTicketInput,
 ): Promise<void> {
-  const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   const channel = await getRabbitChannel();
 
-  await publishOutboundMessage(channel, {
-    target: input.target,
-    whatsappChannel: input.whatsappChannel,
-    messagingSession: input.messagingSession,
-    answer: { text: agent?.transferMessage ?? "", audio: "", image: "" },
-    finishesProcessing: true,
-    origin: "SYSTEM",
-  });
+  if (!input.skipTransferMessage) {
+    const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
+    await publishOutboundMessage(channel, {
+      target: input.target,
+      whatsappChannel: input.whatsappChannel,
+      messagingSession: input.messagingSession,
+      answer: { text: agent?.transferMessage ?? "", audio: "", image: "" },
+      finishesProcessing: true,
+      origin: "SYSTEM",
+    });
+  }
 
   await publishDeskEvent({
     type: "ticket_new",
