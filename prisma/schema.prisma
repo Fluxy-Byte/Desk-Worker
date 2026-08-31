@@ -32,15 +32,15 @@ model User {
 }
 
 model Organization {
-  id        String   @id
-  name      String
-  slug      String
-  logo      String?
-  createdAt DateTime
-  metadata  String?
-  cnpj      String
-  status    String?  @default("ACTIVE")
-  tokenAcessApi String? @unique
+  id            String   @id
+  name          String
+  slug          String
+  logo          String?
+  createdAt     DateTime
+  metadata      String?
+  cnpj          String
+  status        String?  @default("ACTIVE")
+  tokenAcessApi String?  @unique
 
   members          Member[]
   agents           Agent[]
@@ -61,13 +61,13 @@ enum AttendantStatus {
 }
 
 model Member {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role           String       @default("member")
-  createdAt      DateTime     @default(now())
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            String          @default("member")
+  createdAt       DateTime        @default(now())
   status          AttendantStatus @default(OFFLINE)
   statusUpdatedAt DateTime?
 
@@ -94,7 +94,7 @@ model Agent {
   closingMessage           String
   closingEnabled           Boolean @default(true)
   errorMessage             String
-  errorEnabled              Boolean @default(true)
+  errorEnabled             Boolean @default(true)
 
   defaultQueueId String?
   defaultQueue   Queue?  @relation(fields: [defaultQueueId], references: [id], onDelete: SetNull)
@@ -115,9 +115,9 @@ model WhatsappChannel {
   agentId        String
   agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
-  phoneNumberId String @unique
-  displayNumber String
-  wabaId        String @unique
+  phoneNumberId   String  @unique
+  displayNumber   String
+  wabaId          String  @unique
   metaAccessToken String?
 
   createdAt DateTime @default(now())
@@ -131,13 +131,13 @@ model WhatsappChannel {
 }
 
 model ServiceIsland {
-  id                String          @id @default(cuid())
-  organizationId    String
-  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  whatsappChannelId String          @unique
-  whatsappChannel   WhatsappChannel @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
-  name              String
-  allowActiveDispatch Boolean @default(false)
+  id                  String          @id @default(cuid())
+  organizationId      String
+  organization        Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  whatsappChannelId   String          @unique
+  whatsappChannel     WhatsappChannel @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
+  name                String
+  allowActiveDispatch Boolean         @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,6 +161,10 @@ model Queue {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Soft delete â ver Agent-Api/prisma/schema.prisma (schema canÃ´nico) pro
+  /// comentÃ¡rio completo. null = fila ativa normalmente.
+  deletedAt DateTime?
 
   members          QueueMember[]
   tickets          Ticket[]
@@ -220,9 +224,9 @@ enum SessionOrigin {
 }
 
 model MessagingSession {
-  id                String   @id @default(cuid())
+  id                String @id @default(cuid())
   targetId          String
-  target            Target   @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  target            Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
   whatsappChannelId String
 
   createdVia             SessionOrigin @default(CUSTOMER_MESSAGE)
