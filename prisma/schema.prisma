@@ -89,6 +89,7 @@ model Agent {
   processingMessage        String
   transferMessage          String
   unsupportedFormatMessage String
+  blockedMessage           String
   outOfHoursMessage        String
   outOfHoursEnabled        Boolean @default(true)
   closingMessage           String
@@ -198,7 +199,12 @@ model Target {
   whatsappChannelId String
   whatsappChannel   WhatsappChannel @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
 
-  waId     String
+  /// Business-Scoped User ID (contacts[].user_id) — vínculo principal do
+  /// contato, sempre presente desde abr/2026.
+  bsuid    String?
+  /// wa_id da Meta — opcional (omitido quando o contato ativa @username e
+  /// não há troca recente de telefone).
+  waId     String?
   name     String?
   email    String?
   metadata Json?
@@ -207,12 +213,18 @@ model Target {
   firstInteractionAt DateTime     @default(now())
   lastInteractionAt  DateTime?
 
+  /// Ids de Agent que este contato está bloqueado de falar — ver
+  /// Agent-Api/prisma/schema.prisma (schema canônico) pro comentário
+  /// completo.
+  blockedAgentIds String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   messagingSessions MessagingSession[]
   tickets           Ticket[]
 
+  @@unique([organizationId, whatsappChannelId, bsuid])
   @@unique([organizationId, whatsappChannelId, waId])
   @@index([organizationId])
   @@index([whatsappChannelId])
