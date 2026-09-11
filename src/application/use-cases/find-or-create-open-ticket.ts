@@ -12,7 +12,10 @@ interface FindOrCreateOpenTicketInput {
   target: unknown;
   whatsappChannel: unknown;
   messagingSession: unknown;
-  agentId: string;
+  /// Ausente quando o canal não tem agente de IA vinculado (openAgent=false
+  /// desde a origem) — nesse caso usa DEFAULT_TRANSFER_MESSAGE no lugar da
+  /// transferMessage configurada no agente.
+  agentId?: string;
   /// Se preenchido, o ticket já nasce IN_PROGRESS atribuído a este atendente
   /// em vez de WAITING na fila (ex: campanha que direciona pra um atendente
   /// específico). O handoff de IA nunca manda isso — comportamento inalterado.
@@ -92,6 +95,13 @@ export async function findOrCreateOpenTicket(
   }
 }
 
+/// Usada quando o ticket nasce sem agente vinculado (canal com openAgent=false
+/// e sem nenhum Agent — só atendimento humano) — não existe transferMessage
+/// configurada nesse caso. Reexportada por handle-desk-message-inbound.ts
+/// pro mesmo cenário no reenvio (throttle) da mensagem de espera.
+export const DEFAULT_TRANSFER_MESSAGE =
+  "Você foi encaminhado para o nosso atendimento humano. Já já alguém te chama por aqui!";
+
 async function sendTransferMessageAndNotify(
   ticket: { id: string; queueId: string },
   input: FindOrCreateOpenTicketInput,
@@ -99,12 +109,12 @@ async function sendTransferMessageAndNotify(
   const channel = await getRabbitChannel();
 
   if (!input.skipTransferMessage) {
-    const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
+    const agent = input.agentId ? await prisma.agent.findUnique({ where: { id: input.agentId } }) : null;
     await publishOutboundMessage(channel, {
       target: input.target,
       whatsappChannel: input.whatsappChannel,
       messagingSession: input.messagingSession,
-      answer: { text: agent?.transferMessage ?? "", audio: "", image: "" },
+      answer: { text: agent?.transferMessage ?? DEFAULT_TRANSFER_MESSAGE, audio: "", image: "" },
       finishesProcessing: true,
       origin: "SYSTEM",
     });

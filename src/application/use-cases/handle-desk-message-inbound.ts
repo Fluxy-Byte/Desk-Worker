@@ -3,7 +3,7 @@ import { setLastInboundMessage } from "../../infrastructure/cache/redis/last-inb
 import { getRabbitChannel } from "../../infrastructure/queue/rabbitmq/connection";
 import { publishOutboundMessage } from "../../infrastructure/queue/rabbitmq/publisher";
 import { publishDeskEvent } from "../../infrastructure/pubsub/desk-events";
-import { findOrCreateOpenTicket } from "./find-or-create-open-ticket";
+import { DEFAULT_TRANSFER_MESSAGE, findOrCreateOpenTicket } from "./find-or-create-open-ticket";
 
 const WAITING_MESSAGE_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -11,7 +11,13 @@ interface DeskMessageInboundPayload {
   target: { id: string; organizationId?: string; [key: string]: unknown };
   whatsappChannel: { id: string; [key: string]: unknown };
   messagingSession: { id: string; [key: string]: unknown };
-  agent: { id: string; name: string };
+  /// Ausente quando o canal não tem agente de IA vinculado (openAgent=false
+  /// desde a origem, ver Inbound-Service webhook-service.ts).
+  agent: { id: string; name: string } | null;
+  /// Fila (Queue) a usar quando não há staleOpenTicket.queueId nem agente pra
+  /// resolver defaultQueueId — mandado pelo Inbound-Service a partir de
+  /// WhatsappChannel.idServiceIslandDefault quando openAgent=false.
+  defaultQueueId?: string | null;
   message: { mongoMessageId?: string; externalMessageId?: string; type: string; text?: string; timestamp?: string };
 }
 
@@ -61,9 +67,11 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
 
     // Precisamos de uma fila — usamos a fila do ticket que acabamos de
     // reabrir (SESSION_EXPIRED) pra manter o cliente com o mesmo
-    // atendente/fila; senão a fila padrão do agente (comportamento anterior).
-    let queueId = staleOpenTicket?.queueId;
-    if (!queueId) {
+    // atendente/fila; senão payload.defaultQueueId (canal com openAgent=false,
+    // ver Inbound-Service) e só por último a fila padrão do agente
+    // (comportamento anterior, handoff de IA).
+    let queueId = staleOpenTicket?.queueId ?? payload.defaultQueueId ?? undefined;
+    if (!queueId && payload.agent) {
       const agent = await prisma.agent.findUnique({ where: { id: payload.agent.id } });
       queueId = agent?.defaultQueueId ?? undefined;
     }
@@ -77,7 +85,7 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
       target: payload.target,
       whatsappChannel: payload.whatsappChannel,
       messagingSession: payload.messagingSession,
-      agentId: payload.agent.id,
+      agentId: payload.agent?.id,
       assignedUserId:
         staleOpenTicket?.status === "IN_PROGRESS" ? (staleOpenTicket.assignedUserId ?? undefined) : undefined,
       transferredFromTicketId: staleOpenTicket?.id,
@@ -111,14 +119,14 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
       Date.now() - ticket.lastWaitingMessageSentAt.getTime() < WAITING_MESSAGE_THROTTLE_MS;
 
     if (!throttled) {
-      const agent = await prisma.agent.findUnique({ where: { id: payload.agent.id } });
+      const agent = payload.agent ? await prisma.agent.findUnique({ where: { id: payload.agent.id } }) : null;
       const channel = await getRabbitChannel();
 
       await publishOutboundMessage(channel, {
         target: payload.target,
         whatsappChannel: payload.whatsappChannel,
         messagingSession: payload.messagingSession,
-        answer: { text: agent?.transferMessage ?? "", audio: "", image: "" },
+        answer: { text: agent?.transferMessage ?? DEFAULT_TRANSFER_MESSAGE, audio: "", image: "" },
         finishesProcessing: true,
         origin: "SYSTEM",
       });
