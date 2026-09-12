@@ -141,9 +141,29 @@ model ServiceIsland {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  queues Queue[]
+  queues                Queue[]
+  preConfiguredMessages PreConfiguredMessage[]
 
   @@index([organizationId])
+}
+
+/// Mensagem pronta gerida no Agent Console e usada pelo atendente no Desk
+/// Console como atalho ao responder um ticket. Ver Agent-Api/prisma/schema.prisma
+/// (schema canônico) pro comentário completo.
+model PreConfiguredMessage {
+  id              String        @id @default(cuid())
+  serviceIslandId String
+  serviceIsland   ServiceIsland @relation(fields: [serviceIslandId], references: [id], onDelete: Cascade)
+  name            String
+  content         String
+
+  queues Queue[] @relation("PreConfiguredMessageQueues")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([serviceIslandId, name])
+  @@index([serviceIslandId])
 }
 
 model Queue {
@@ -165,9 +185,10 @@ model Queue {
   /// comentÃ¡rio completo. null = fila ativa normalmente.
   deletedAt DateTime?
 
-  members          QueueMember[]
-  tickets          Ticket[]
-  defaultForAgents Agent[]
+  members               QueueMember[]
+  tickets               Ticket[]
+  defaultForAgents      Agent[]
+  preConfiguredMessages PreConfiguredMessage[] @relation("PreConfiguredMessageQueues")
 
   @@index([serviceIslandId])
 }
