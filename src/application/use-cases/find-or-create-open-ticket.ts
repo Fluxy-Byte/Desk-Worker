@@ -10,7 +10,7 @@ interface FindOrCreateOpenTicketInput {
   targetId: string;
   messagingSessionId: string;
   target: unknown;
-  whatsappChannel: unknown;
+  channel: unknown;
   messagingSession: unknown;
   /// Ausente quando o canal não tem agente de IA vinculado (openAgent=false
   /// desde a origem) — nesse caso usa DEFAULT_TRANSFER_MESSAGE no lugar da
@@ -112,7 +112,7 @@ async function sendTransferMessageAndNotify(
     const agent = input.agentId ? await prisma.agent.findUnique({ where: { id: input.agentId } }) : null;
     await publishOutboundMessage(channel, {
       target: input.target,
-      whatsappChannel: input.whatsappChannel,
+      channel: input.channel,
       messagingSession: input.messagingSession,
       answer: { text: agent?.transferMessage ?? DEFAULT_TRANSFER_MESSAGE, audio: "", image: "" },
       finishesProcessing: true,

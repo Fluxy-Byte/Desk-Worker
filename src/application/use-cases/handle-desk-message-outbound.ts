@@ -82,7 +82,7 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
 
   await publishOutboundMessage(channel, {
     target: ticket.target,
-    whatsappChannel: ticket.target.whatsappChannel,
+    channel: ticket.target.whatsappChannel,
     messagingSession: ticket.messagingSession,
     answer: { text: payload.text, audio: "", image: "" },
     messageType: payload.messageType,

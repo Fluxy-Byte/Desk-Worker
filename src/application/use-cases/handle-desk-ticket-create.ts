@@ -6,7 +6,7 @@ import { findOrCreateOpenTicket } from "./find-or-create-open-ticket";
 
 interface DeskTicketCreatePayload {
   target: { id: string; [key: string]: unknown };
-  whatsappChannel: { id: string; [key: string]: unknown };
+  channel: { id: string; [key: string]: unknown };
   messagingSession: { id: string; [key: string]: unknown };
   agent: { id: string; name: string };
   queueId: string;
@@ -49,7 +49,7 @@ export async function handleDeskTicketCreate(payload: DeskTicketCreatePayload): 
     targetId: payload.target.id,
     messagingSessionId: payload.messagingSession.id,
     target: payload.target,
-    whatsappChannel: payload.whatsappChannel,
+    channel: payload.channel,
     messagingSession: payload.messagingSession,
     agentId: payload.agent.id,
     assignedUserId: payload.assignedUserId,
@@ -67,7 +67,7 @@ async function sendOutOfHoursMessage(payload: DeskTicketCreatePayload): Promise<
   const channel = await getRabbitChannel();
   await publishOutboundMessage(channel, {
     target: payload.target,
-    whatsappChannel: payload.whatsappChannel,
+    channel: payload.channel,
     messagingSession: payload.messagingSession,
     answer: { text: agent.outOfHoursMessage, audio: "", image: "" },
     finishesProcessing: true,
@@ -77,18 +77,18 @@ async function sendOutOfHoursMessage(payload: DeskTicketCreatePayload): Promise<
 
 /// organizationId idealmente já vem no payload (target.organizationId), mas
 /// como o formato exato montado pelo Inbound-Service pode variar, cai pro
-/// lookup via WhatsappChannel (sempre presente e único) como fallback robusto.
+/// lookup via Channel (sempre presente e único) como fallback robusto.
 async function resolveOrganizationId(payload: DeskTicketCreatePayload): Promise<string> {
   const fromPayload = (payload.target as { organizationId?: string }).organizationId;
   if (fromPayload) return fromPayload;
 
-  const channel = await prisma.whatsappChannel.findUnique({
-    where: { id: payload.whatsappChannel.id },
+  const channel = await prisma.channel.findUnique({
+    where: { id: payload.channel.id },
     select: { organizationId: true },
   });
   if (!channel) {
     throw new Error(
-      `Não foi possível resolver organizationId para desk.ticket.create (whatsappChannel=${payload.whatsappChannel.id}).`,
+      `Não foi possível resolver organizationId para desk.ticket.create (channel=${payload.channel.id}).`,
     );
   }
   return channel.organizationId;

@@ -9,14 +9,14 @@ const WAITING_MESSAGE_THROTTLE_MS = 5 * 60 * 1000;
 
 interface DeskMessageInboundPayload {
   target: { id: string; organizationId?: string; [key: string]: unknown };
-  whatsappChannel: { id: string; [key: string]: unknown };
+  channel: { id: string; [key: string]: unknown };
   messagingSession: { id: string; [key: string]: unknown };
   /// Ausente quando o canal não tem agente de IA vinculado (openAgent=false
   /// desde a origem, ver Inbound-Service webhook-service.ts).
   agent: { id: string; name: string } | null;
   /// Fila (Queue) a usar quando não há staleOpenTicket.queueId nem agente pra
   /// resolver defaultQueueId — mandado pelo Inbound-Service a partir de
-  /// WhatsappChannel.idServiceIslandDefault quando openAgent=false.
+  /// Channel.idServiceIslandDefault quando openAgent=false.
   defaultQueueId?: string | null;
   message: { mongoMessageId?: string; externalMessageId?: string; type: string; text?: string; timestamp?: string };
 }
@@ -59,11 +59,11 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
       );
     }
 
-    const channel = await prisma.whatsappChannel.findUnique({
-      where: { id: payload.whatsappChannel.id },
+    const channel = await prisma.channel.findUnique({
+      where: { id: payload.channel.id },
       select: { organizationId: true },
     });
-    if (!channel) throw new Error(`WhatsappChannel ${payload.whatsappChannel.id} não encontrado.`);
+    if (!channel) throw new Error(`Channel ${payload.channel.id} não encontrado.`);
 
     // Precisamos de uma fila — usamos a fila do ticket que acabamos de
     // reabrir (SESSION_EXPIRED) pra manter o cliente com o mesmo
@@ -83,7 +83,7 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
       targetId: payload.target.id,
       messagingSessionId: payload.messagingSession.id,
       target: payload.target,
-      whatsappChannel: payload.whatsappChannel,
+      channel: payload.channel,
       messagingSession: payload.messagingSession,
       agentId: payload.agent?.id,
       assignedUserId:
@@ -124,7 +124,7 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
 
       await publishOutboundMessage(channel, {
         target: payload.target,
-        whatsappChannel: payload.whatsappChannel,
+        channel: payload.channel,
         messagingSession: payload.messagingSession,
         answer: { text: agent?.transferMessage ?? DEFAULT_TRANSFER_MESSAGE, audio: "", image: "" },
         finishesProcessing: true,
