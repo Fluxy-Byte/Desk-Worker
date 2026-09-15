@@ -19,6 +19,9 @@ interface DeskTicketCreatePayload {
 /// atendimento humano (e também pelo Campaign-Worker, quando uma campanha
 /// tem routeToQueueId). Idempotente: se já existe ticket aberto pra essa
 /// sessão, não faz nada (nem reenvia a transferMessage).
+///
+/// Sem MessageLog aqui de propósito: este payload é sobre sessão/fila, não
+/// sobre uma mensagem específica (não carrega mongoMessageId/externalMessageId).
 export async function handleDeskTicketCreate(payload: DeskTicketCreatePayload): Promise<void> {
   const organizationId = await resolveOrganizationId(payload);
 

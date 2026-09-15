@@ -4,6 +4,7 @@ import { getRabbitChannel } from "../../infrastructure/queue/rabbitmq/connection
 import { publishOutboundMessage } from "../../infrastructure/queue/rabbitmq/publisher";
 import { publishDeskEvent } from "../../infrastructure/pubsub/desk-events";
 import { DEFAULT_TRANSFER_MESSAGE, findOrCreateOpenTicket } from "./find-or-create-open-ticket";
+import { recordMessageLog } from "./message-log-service";
 
 const WAITING_MESSAGE_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -29,6 +30,9 @@ interface DeskMessageInboundPayload {
 /// ainda estava aberto (a janela de 24h venceu sem ninguém fechar), fechando-o
 /// agora como SESSION_EXPIRED em vez de deixá-lo órfão pra sempre.
 export async function handleDeskMessageInbound(payload: DeskMessageInboundPayload): Promise<void> {
+  const messageId = payload.message.mongoMessageId ?? payload.message.externalMessageId;
+  if (messageId) await recordMessageLog(messageId, "start");
+
   const ticket = await prisma.ticket.findFirst({
     where: { messagingSessionId: payload.messagingSession.id },
     orderBy: { createdAt: "desc" },
@@ -90,6 +94,7 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
         staleOpenTicket?.status === "IN_PROGRESS" ? (staleOpenTicket.assignedUserId ?? undefined) : undefined,
       transferredFromTicketId: staleOpenTicket?.id,
     });
+    if (messageId) await recordMessageLog(messageId, "end");
     return;
   }
 
@@ -136,6 +141,7 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
   }
 
   await publishDeskEvent({ type: "ticket_message", ticketId: ticket.id, payload: { ticketId: ticket.id } });
+  if (messageId) await recordMessageLog(messageId, "end");
 }
 
 function normalizeMessageType(type: string): "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER" {

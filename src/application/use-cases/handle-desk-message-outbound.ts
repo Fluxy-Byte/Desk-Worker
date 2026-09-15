@@ -15,6 +15,12 @@ interface DeskMessageOutboundPayload {
 /// Consome `desk.message.outbound` — publicado pelo Desk-API quando um
 /// atendente envia uma mensagem. mongoMessageId começa null e é preenchido
 /// depois via `desk.message.sent` (reconciliação, ver handle-desk-message-sent).
+///
+/// Sem MessageLog aqui de propósito: esta mensagem nasce agora, sem
+/// mongoMessageId/externalMessageId nem qualquer referência a uma mensagem
+/// inbound — não há id nenhum pra registrar ainda. O início do rastreamento
+/// dela só é possível no Outbound-Worker, quando o Mongo gera o
+/// mongoMessageId (ver send-outbound-message.ts).
 export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayload): Promise<void> {
   console.log(`[DESK-MSG][handleDeskMessageOutbound] início — ticketId=${payload.ticketId} attendantUserId=${payload.attendantUserId}`);
 

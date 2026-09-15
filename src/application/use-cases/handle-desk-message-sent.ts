@@ -1,5 +1,6 @@
 import { prisma } from "../../infrastructure/database/prisma/client";
 import { publishDeskEvent } from "../../infrastructure/pubsub/desk-events";
+import { recordMessageLog } from "./message-log-service";
 
 interface DeskMessageSentPayload {
   ticketId: string;
@@ -12,12 +13,17 @@ interface DeskMessageSentPayload {
 /// Reconciliação FIFO: casa com o TicketMessage otimista mais antigo ainda sem
 /// mongoMessageId (mesmo padrão do fluxy-desk-api deprecado).
 export async function handleDeskMessageSent(payload: DeskMessageSentPayload): Promise<void> {
+  await recordMessageLog(payload.mongoMessageId, "start");
+
   const pending = await prisma.ticketMessage.findFirst({
     where: { ticketId: payload.ticketId, senderType: "ATTENDANT", mongoMessageId: null },
     orderBy: { createdAt: "asc" },
   });
 
-  if (!pending) return;
+  if (!pending) {
+    await recordMessageLog(payload.mongoMessageId, "end");
+    return;
+  }
 
   await prisma.ticketMessage.update({
     where: { id: pending.id },
@@ -28,4 +34,5 @@ export async function handleDeskMessageSent(payload: DeskMessageSentPayload): Pr
   // Mongo (mongoMessageId preenchido) — os próximos ticks de entregue/lido já
   // chegam sozinhos via Notification-Worker (evento "message_status").
   await publishDeskEvent({ type: "ticket_message", ticketId: payload.ticketId, payload: { ticketId: payload.ticketId } });
+  await recordMessageLog(payload.mongoMessageId, "end");
 }

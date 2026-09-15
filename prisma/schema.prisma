@@ -130,13 +130,13 @@ model Channel {
 }
 
 model ServiceIsland {
-  id                  String          @id @default(cuid())
+  id                  String       @id @default(cuid())
   organizationId      String
-  organization        Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  whatsappChannelId   String          @unique
-  whatsappChannel     Channel @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  whatsappChannelId   String       @unique
+  whatsappChannel     Channel      @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
   name                String
-  allowActiveDispatch Boolean         @default(false)
+  allowActiveDispatch Boolean      @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,11 +212,11 @@ enum TargetStatus {
 }
 
 model Target {
-  id                String          @id @default(cuid())
+  id                String       @id @default(cuid())
   organizationId    String
-  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   whatsappChannelId String
-  whatsappChannel   Channel @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
+  whatsappChannel   Channel      @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
 
   /// Business-Scoped User ID (contacts[].user_id) — vínculo principal do
   /// contato, sempre presente desde abr/2026.
@@ -367,4 +367,19 @@ model ProcessedInboundMessage {
   processedAt       DateTime @default(now())
 
   @@index([whatsappChannelId])
+}
+
+/// Rastreamento de uma mensagem passando pelos serviços da mensageria — ver
+/// Agent-Api/prisma/schema.prisma (schema canônico) pro comentário completo
+/// e MENSAGERIA.md pro mapa das filas. Sem FK: messageId é um ponteiro solto
+/// (Mongo _id da mensagem, ou o id disponível naquele estágio).
+model MessageLog {
+  id         String   @id @default(cuid())
+  messageId  String
+  createdAt  DateTime @default(now())
+  messageLog String
+  stagio     String
+
+  @@index([messageId])
+  @@index([messageLog, stagio])
 }
