@@ -82,7 +82,11 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
   // Avisa o front em tempo real assim que a TicketMessage existe — sem isso o
   // balão otimista de "enviando..." só some quando algum OUTRO evento (resposta
   // do cliente, tick de status) força um refetch por coincidência.
-  await publishDeskEvent({ type: "ticket_message", ticketId: ticket.id, payload: { ticketId: ticket.id } });
+  await publishDeskEvent({
+    type: "ticket_message",
+    ticketId: ticket.id,
+    payload: { ticketId: ticket.id, senderType: "ATTENDANT" },
+  });
 
   console.log(`[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} publicando em outbound.message.send`);
 

@@ -33,6 +33,10 @@ export async function handleDeskMessageSent(payload: DeskMessageSentPayload): Pr
   // A partir daqui o front consegue casar a mensagem com o waStatus vindo do
   // Mongo (mongoMessageId preenchido) — os próximos ticks de entregue/lido já
   // chegam sozinhos via Notification-Worker (evento "message_status").
-  await publishDeskEvent({ type: "ticket_message", ticketId: payload.ticketId, payload: { ticketId: payload.ticketId } });
+  await publishDeskEvent({
+    type: "ticket_message",
+    ticketId: payload.ticketId,
+    payload: { ticketId: payload.ticketId, senderType: "ATTENDANT" },
+  });
   await recordMessageLog(payload.mongoMessageId, "end");
 }

@@ -140,7 +140,11 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
     }
   }
 
-  await publishDeskEvent({ type: "ticket_message", ticketId: ticket.id, payload: { ticketId: ticket.id } });
+  await publishDeskEvent({
+    type: "ticket_message",
+    ticketId: ticket.id,
+    payload: { ticketId: ticket.id, senderType: "CLIENT" },
+  });
   if (messageId) await recordMessageLog(messageId, "end");
 }
 
