@@ -345,6 +345,7 @@ enum MessageType {
   IMAGE
   DOCUMENT
   STICKER
+  VIDEO
 }
 
 model TicketMessage {

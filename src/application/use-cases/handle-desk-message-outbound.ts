@@ -8,7 +8,7 @@ interface DeskMessageOutboundPayload {
   ticketId: string;
   text: string;
   attendantUserId: string;
-  messageType?: "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER";
+  messageType?: "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER" | "VIDEO";
   mediaUrl?: string;
 }
 

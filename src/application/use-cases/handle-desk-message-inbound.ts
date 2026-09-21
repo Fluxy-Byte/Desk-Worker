@@ -148,9 +148,9 @@ export async function handleDeskMessageInbound(payload: DeskMessageInboundPayloa
   if (messageId) await recordMessageLog(messageId, "end");
 }
 
-function normalizeMessageType(type: string): "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER" {
+function normalizeMessageType(type: string): "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER" | "VIDEO" {
   const upper = type.toUpperCase();
-  if (upper === "TEXT" || upper === "AUDIO" || upper === "IMAGE" || upper === "DOCUMENT" || upper === "STICKER") {
+  if (upper === "TEXT" || upper === "AUDIO" || upper === "IMAGE" || upper === "DOCUMENT" || upper === "STICKER" || upper === "VIDEO") {
     return upper;
   }
   return "TEXT";

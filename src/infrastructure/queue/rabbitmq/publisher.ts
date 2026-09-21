@@ -9,7 +9,7 @@ interface OutboundMessagePayload {
   channel: unknown;
   messagingSession: unknown;
   answer: { text: string; audio: string; image: string };
-  messageType?: "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER";
+  messageType?: "TEXT" | "AUDIO" | "IMAGE" | "DOCUMENT" | "STICKER" | "VIDEO";
   mediaUrl?: string;
   finishesProcessing: boolean;
   origin: "SYSTEM" | "ATTENDANT";
