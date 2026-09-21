@@ -137,6 +137,7 @@ model ServiceIsland {
   whatsappChannel     Channel      @relation(fields: [whatsappChannelId], references: [id], onDelete: Cascade)
   name                String
   allowActiveDispatch Boolean      @default(false)
+  useAttendantSignature Boolean    @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

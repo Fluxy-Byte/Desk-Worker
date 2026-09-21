@@ -26,7 +26,11 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: payload.ticketId },
-    include: { target: { include: { whatsappChannel: true } }, messagingSession: true },
+    include: {
+      target: { include: { whatsappChannel: true } },
+      messagingSession: true,
+      queue: { select: { serviceIsland: { select: { useAttendantSignature: true } } } },
+    },
   });
 
   if (!ticket) {
@@ -88,13 +92,27 @@ export async function handleDeskMessageOutbound(payload: DeskMessageOutboundPayl
     payload: { ticketId: ticket.id, senderType: "ATTENDANT" },
   });
 
+  // Ilha com "Usar assinatura com nome dos atendentes" ligado: toda mensagem
+  // de TEXTO do atendente sai como "*Nome:*\n<mensagem>" (negrito do
+  // WhatsApp). Mídia não leva assinatura — o texto dela é legenda/nome do
+  // arquivo. O Outbound-Worker grava no Mongo exatamente o texto enviado, então
+  // o histórico mostra a assinatura como o cliente a viu.
+  let outboundText = payload.text;
+  const isPlainText = !payload.messageType || payload.messageType === "TEXT";
+  if (isPlainText && payload.text.trim() && ticket.queue.serviceIsland.useAttendantSignature) {
+    const attendant = await prisma.user.findUnique({ where: { id: payload.attendantUserId }, select: { name: true } });
+    // Asterisco no nome quebraria o negrito do WhatsApp.
+    const attendantName = attendant?.name.replace(/\*/g, "").trim();
+    if (attendantName) outboundText = `*${attendantName}:*\n${payload.text}`;
+  }
+
   console.log(`[DESK-MSG][handleDeskMessageOutbound] ticketId=${payload.ticketId} publicando em outbound.message.send`);
 
   await publishOutboundMessage(channel, {
     target: ticket.target,
     channel: ticket.target.whatsappChannel,
     messagingSession: ticket.messagingSession,
-    answer: { text: payload.text, audio: "", image: "" },
+    answer: { text: outboundText, audio: "", image: "" },
     messageType: payload.messageType,
     mediaUrl: payload.mediaUrl,
     finishesProcessing: true,
