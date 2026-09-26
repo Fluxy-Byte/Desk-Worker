@@ -186,12 +186,31 @@ model Queue {
   /// comentÃ¡rio completo. null = fila ativa normalmente.
   deletedAt DateTime?
 
+  carteiraEnabled Boolean @default(false)
+
   members               QueueMember[]
   tickets               Ticket[]
   defaultForAgents      Agent[]
   preConfiguredMessages PreConfiguredMessage[] @relation("PreConfiguredMessageQueues")
+  carteiras             Carteira[]
 
   @@index([serviceIslandId])
+}
+
+/// Carteira de atendimento — ver Agent-Api/prisma/schema.prisma (schema
+/// canônico) pro comentário completo.
+model Carteira {
+  id        String   @id @default(cuid())
+  name      String
+  queueId   String
+  queue     Queue    @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  targetIds String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([queueId])
+  @@index([targetIds], type: Gin)
 }
 
 model QueueMember {

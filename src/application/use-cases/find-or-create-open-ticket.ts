@@ -65,6 +65,36 @@ async function createTicketUnderCounter(input: FindOrCreateOpenTicketInput) {
   });
 }
 
+/// Carteira de atendimento: se o contato está em alguma carteira cuja fila
+/// ainda está liberada (carteiraEnabled), ativa e não excluída, o ticket vai
+/// pra fila da carteira em vez da fila original. Com mais de uma carteira,
+/// vale a mais antiga. Ticket que já nasce atribuído a um atendente
+/// (campanha direcionada, reabertura de ticket IN_PROGRESS) mantém a fila
+/// original — o atendente pode nem ser membro da fila da carteira.
+async function resolveCarteiraQueueId(input: FindOrCreateOpenTicketInput): Promise<string> {
+  if (input.assignedUserId) return input.queueId;
+
+  const carteira = await prisma.carteira.findFirst({
+    where: {
+      targetIds: { has: input.targetId },
+      queue: {
+        carteiraEnabled: true,
+        isActive: true,
+        deletedAt: null,
+        serviceIsland: { organizationId: input.organizationId },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, queueId: true },
+  });
+  if (!carteira || carteira.queueId === input.queueId) return input.queueId;
+
+  console.log(
+    `[DESK-MSG][find-or-create-open-ticket] targetId=${input.targetId} pertence à carteira ${carteira.id} — fila ${input.queueId} trocada por ${carteira.queueId}`,
+  );
+  return carteira.queueId;
+}
+
 /// REGRA MAIS IMPORTANTE do Desk Worker: nunca mais de um ticket aberto
 /// (WAITING | IN_PROGRESS) por MessagingSession. Garantido em dois níveis:
 /// (1) checagem prévia (rápida, cobre o caso comum), (2) índice único parcial
@@ -79,7 +109,7 @@ export async function findOrCreateOpenTicket(
   if (existing) return { ticket: existing, created: false };
 
   try {
-    const ticket = await createTicketUnderCounter(input);
+    const ticket = await createTicketUnderCounter({ ...input, queueId: await resolveCarteiraQueueId(input) });
     await sendTransferMessageAndNotify(ticket, input);
     return { ticket, created: true };
   } catch (error) {
